@@ -1,6 +1,8 @@
 # CTF Notes and Writeups Repository
 
-This repository is a personal collection of code snippets & scripts from CTFs challenges I’ve solved—either from my own practice or featured on [my channel](https://www.youtube.com/@strikoder). The primary goal of this repo is to serve as structured notes for future reference and tools usage.
+This repository is a personal collection of code snippets & scripts from CTFs challenges I’ve solved, either from my own practice or featured on [my channel](https://www.youtube.com/@strikoder). 
+
+The primary goal of this repo is to serve as structured notes for future reference and tools usage.
 
 ## How to Use
 
