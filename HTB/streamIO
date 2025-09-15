@@ -1,9 +1,8 @@
-#############################################
-# 🔹 HTB: StreamIO Walkthrough
+
+# HTB: [StreamIO](https://www.hackthebox.com/machines/streamio) Walkthrough
 # Video: https://youtu.be/JgHjbwW-RhI
-#############################################
 
-
+```bash
 #############################################
 # 1️⃣ Initial Enumeration
 #############################################
@@ -151,3 +150,4 @@ Administrator : '0V6B3}&!7O+Wg0'
 
 # Final shell
 impacket-psexec Administrator:'0V6B3}&!7O+Wg0'@$IP
+```
