@@ -18,7 +18,7 @@ cat hibernate.cfg.xml | grep -i "pass"
 
 **SSH Access:**
 ```bash
-ssh -o PubkeyAcceptedKeyTypes=+ssh-rsa oliver@$IP
+ssh -o KexAlgorithms=diffie-hellman-group14-sha256 oliver@$IP
 # Password: [found_password]
 ```
 
