@@ -73,13 +73,11 @@ ssh user@conversor.htb
 # Check sudo privileges
 sudo -l
 
-# [Check GTFOBins if you could add the flags]
+# we check gtfobins and sudo -l and we see that we can use all flags
 # Found: -c flag with privesc.perl
-
-# Download template XSLT and check version
 ```
 
-**Exploit:** CVE-2024-48990 - needrestart Privilege Escalation
+**Or we exploit it through:** CVE-2024-48990 - needrestart Privilege Escalation
 - **Payload:** https://github.com/pentestfunctions/CVE-2024-48990-PoC-Testing
 ```bash
 # Compile exploit on attacker machine
